@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: apps-script-mcp-server
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: TRANSPORT
+        value: http
+      - key: MCP_SERVER_TOKEN
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        sync: false
