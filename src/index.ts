@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash, timingSafeEqual } from "node:crypto";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -42,10 +43,19 @@ async function runHttp(): Promise<void> {
     res.status(200).send("ok");
   });
 
-  app.post("/mcp", async (req, res) => {
-    const authHeader = req.headers.authorization ?? "";
-    const expected = `Bearer ${requiredToken}`;
-    if (authHeader !== expected) {
+  // Constant-time comparison; hashing first makes both buffers the same length.
+  const tokenMatches = (candidate: string): boolean => {
+    const digest = (s: string) => createHash("sha256").update(s).digest();
+    return timingSafeEqual(digest(candidate), digest(requiredToken));
+  };
+
+  // The token may arrive as 'Authorization: Bearer <token>' or as the URL path
+  // segment /mcp/<token>, for clients (like claude.ai custom connectors) that
+  // cannot send custom headers.
+  const handleMcp = async (req: express.Request, res: express.Response) => {
+    const bearer = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+    const supplied = req.params.token ?? bearer;
+    if (!tokenMatches(supplied)) {
       res.status(401).json({
         jsonrpc: "2.0",
         error: { code: -32001, message: "Unauthorized: missing or invalid bearer token" },
@@ -67,6 +77,17 @@ async function runHttp(): Promise<void> {
     });
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
+  };
+
+  app.post(["/mcp", "/mcp/:token"], handleMcp);
+
+  // Stateless server: no SSE stream or session to resume or close.
+  app.all(["/mcp", "/mcp/:token"], (_req, res) => {
+    res.status(405).set("Allow", "POST").json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed" },
+      id: null,
+    });
   });
 
   const port = parseInt(process.env.PORT ?? "3000", 10);
