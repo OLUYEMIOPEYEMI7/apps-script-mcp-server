@@ -204,7 +204,7 @@ with the full file array instead, to avoid multiple round-trips each overwriting
 view of "current state".
 
 Error Handling:
-  - Returns an error if the account isn't authorized yet (run `npm run authorize` first).
+  - Returns an error if the account isn't authorized yet (run \`npm run authorize\` first).
   - Returns an error naming the script_id if the project isn't found or isn't accessible.`,
       inputSchema: {
         script_id: ScriptIdSchema,
